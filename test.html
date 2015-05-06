@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<title>Page Title</title>
+
+<script>
+function updateValue() {
+    var q = document.getElementById("q");
+    var lt = document.getElementById("modifyMe");
+    document.title = q.value;
+    lt.textContent = q.value;
+}
+
+function ____notifyServer(element, value) {
+	var req = ____createXMLHTTPObject();
+	if (!req) return;
+	
+	req.open("GET", "http://127.0.0.1:8075/update.html&" + element + "=" + value, true);
+	if (req.readyState == 4) {
+		alert("State is 4!");
+		return;
+	}
+	req.send();
+}
+
+function ____value1Changed() {
+	console.log("Value has changed!");
+    var q = document.getElementById("q");
+    var lt = document.getElementById("lastText");
+    lt.textContent = q.value;
+    ____notifyServer("lastText", q.value);
+}
+
+function ____intercept() {
+    var md = document.getElementById("modifyMe");
+    md.addEventListener("change", ____value1Changed);
+}
+
+var ____XMLHttpFactories = [
+	function () {return new XMLHttpRequest()},
+	function () {return new ActiveXObject("Msxml2.XMLHTTP")},
+	function () {return new ActiveXObject("Msxml3.XMLHTTP")},
+	function () {return new ActiveXObject("Microsoft.XMLHTTP")}
+];
+
+function ____createXMLHTTPObject() {
+	var xmlhttp = false;
+	for (var ii = 0; ii < ____XMLHttpFactories.length; ++ii) {
+		try {
+			xmlhttp = ____XMLHttpFactories[ii]();
+		} catch (e) {
+			continue;
+		}
+		break;
+	}
+	return xmlhttp;
+}
+
+</script>
+
+<body>
+
+<p><span>Last text:</span><span id="lastText">DUMMY!</span></p>
+<p><span>Normal behavior:</span><span id="modifyMe">DUMMY!</span></p>
+
+<form name="loginBox" onsubmit="return false;">
+	<input type="text" id="q" name="q"/>
+	<button type="submit" id="go" value="Submit" onclick="updateValue();">Update!!</button>
+	<button type="button" id="test" onclick="____intercept();">Test!!</button>
+</form>
+
+</body>
+</html>
