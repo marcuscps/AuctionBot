@@ -1,4 +1,7 @@
-class Auction {
+package auction;
+import sites.Site;
+
+public class Auction {
 
 	public class Listener {
 		void onLoginSuccess() {}
@@ -17,8 +20,15 @@ class Auction {
 		void onPlaceBidFail(long value, String message) {}
 	}
 
+	public enum AuctionMode {
+		Idle,
+		Normal,
+		RandomClosingTime,
+		Closed
+	};
+
 	public Auction(Site site) {
-		site = site;
+		this.site = site;
 	}
 
 	public Listener getListener() {
@@ -32,7 +42,8 @@ class Auction {
 	public void startUp() {
 	}
 
-	private site;
-	private normalBehavior;
-	private randomClosingTimeBehavior;
+	private Site site;
+	private Listener listener;
+	//private normalBehavior;
+	//private randomClosingTimeBehavior;
 }

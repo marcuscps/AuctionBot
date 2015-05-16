@@ -1,8 +1,10 @@
+package auction;
+
 public class Bid {
 
 	public Bid(boolean ours, long value) {
-		ours = ours;
-		value = value;
+		this.ours = ours;
+		this.value = value;
 	}
 
 	public boolean isOurs() {

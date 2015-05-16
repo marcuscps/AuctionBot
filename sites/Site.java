@@ -1,13 +1,13 @@
-class Site {
+package sites;
+import auction.Auction;
+import auction.Auction.AuctionMode;
+import auction.Bid;
 
-	public enum AuctionMode {
-		Idle,
-		Normal,
-		RandomClosingTime,
-		Closed
-	};
+public abstract class Site {
 
 	public interface Listener {
+		void onPageLoadSuccess();
+		void onPageLoadFail(String message);
 		void onLoginSuccess();
 		void onLoginFail(String message);
 		void onOpenProjectSuccess();
@@ -25,11 +25,11 @@ class Site {
 	}
 
 	public Site(String baseURL, String projectId, Listener listener) {
-		baseURL = baseURL;
-		projectId = projectId;
-		listener = listener;
-		mode = AuctionMode.Idle;
-		leadingBid = null;
+		this.baseURL = baseURL;
+		this.projectId = projectId;
+		this.listener = listener;
+		this.mode = AuctionMode.Idle;
+		this.leadingBid = null;
 	}
 
 	public String getBaseURL() {
@@ -49,14 +49,14 @@ class Site {
 	}
 
 	public Auction getNewAuction() {
-		return new Auction();
+		return new Auction(this);
 	}
 
-	public void login() {
-		// TODO
-		listener.onLoginSuccess();
-		listener.onLoginFail("Error message!!");
-	}
+	public abstract void load();
+
+	public abstract void close();
+
+	public abstract void login();
 
 	public void openProject() {
 		// TODO
@@ -93,9 +93,9 @@ class Site {
 		listener.onPlaceBidFail(value, "Error message!!");
 	}
 
-	private String baseURL;
-	private String projectId;
-	private Listener listener;
-	private AuctionMode mode;
-	private Bid leadingBid;
+	protected String baseURL;
+	protected String projectId;
+	protected Listener listener;
+	protected AuctionMode mode;
+	protected Bid leadingBid;
 }
