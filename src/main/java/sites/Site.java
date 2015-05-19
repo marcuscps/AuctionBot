@@ -1,4 +1,6 @@
 package sites;
+import org.openqa.selenium.WebDriver;
+
 import auction.Auction;
 import auction.Auction.AuctionMode;
 import auction.Bid;
@@ -24,7 +26,8 @@ public abstract class Site {
 		void onPlaceBidFail(long value, String message);
 	}
 
-	public Site(String baseURL, String projectId, Listener listener) {
+	public Site(WebDriver driver, String baseURL, String projectId, Listener listener) {
+		this.driver = driver;
 		this.baseURL = baseURL;
 		this.projectId = projectId;
 		this.listener = listener;
@@ -56,14 +59,14 @@ public abstract class Site {
 
 	public abstract void close();
 
+	public void setLogin(String username, String password) {
+		this.username = username;
+		this.password = password;
+	}
+	
 	public abstract void login();
 
-	public void openProject() {
-		// TODO
-		listener.onOpenProjectSuccess();
-		listener.onOpenProjectFail("Error message!!");
-		listener.onAuctionModeChanged(mode);
-	}
+	public abstract void openProject();
 
 	public void startMonitor() {
 		// TODO
@@ -93,7 +96,11 @@ public abstract class Site {
 		listener.onPlaceBidFail(value, "Error message!!");
 	}
 
+    WebDriver driver;
+    
 	protected String baseURL;
+	protected String username;
+	protected String password;
 	protected String projectId;
 	protected Listener listener;
 	protected AuctionMode mode;

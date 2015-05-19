@@ -3,11 +3,16 @@ import sites.ComprasNet;
 import sites.Site;
 import sites.Site.Listener;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 class Main {
 	private Site site;
 	
+	static Logger logger = LoggerFactory.getLogger(Main.class);
+	
 	public static void main(String args[]) {
-		System.out.println("Started!");
+		logger.info("Auction Bot started!");
 		Main main = new Main();
 		main.run();
 	}
@@ -16,25 +21,25 @@ class Main {
 		Listener listener = new Listener() {
 			@Override
 			public void onPageLoadSuccess() {
-				System.out.println("Page loaded!");
+				logger.info("Page loaded");
 				site.login();
 			}
 
 			@Override
 			public void onPageLoadFail(String message) {
-				System.out.println("Error: " + message);
+				logger.error("Page Load error: {}", message);
 			}
 
 			@Override
 			public void onLoginSuccess() {
-				System.out.println("Loged in!");
-				site.close();
+				logger.info("Loged in!");
+//				site.close();
 			}
 			
 			@Override
 			public void onLoginFail(String message) {
-				System.out.println("Error: " + message);
-				site.close();
+				logger.error("Login error: {}", message);
+//				site.close();
 			}
 			
 			@Override
@@ -85,8 +90,11 @@ class Main {
 			public void onAuctionEnded() {
 			}
 		};
+
 		
 		site = new ComprasNet("https://www.comprasnet.gov.br/seguro/loginPortal.asp", "1", listener);
+		site.setLogin("ALSTOMTED", "SALESFORCE2015");
+//		site.setLogin("BLA", "BLE");
 		site.load();
 	}
 }

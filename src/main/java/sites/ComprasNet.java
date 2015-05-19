@@ -8,14 +8,16 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.support.ui.ExpectedCondition;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.FluentWait;
 import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import utils.WebDriverWrapper;
 
 public class ComprasNet extends Site {
+
+	static Logger logger = LoggerFactory.getLogger(ComprasNet.class);
 
 	private static final String idPerfil	= "perfil";
 	private static final String idLogin		= "txtLogin";
@@ -31,27 +33,19 @@ public class ComprasNet extends Site {
 //	private static final By bySenha		= By.id(idSenha);
 //	private static final By byAcessar	= By.id(idAcessar);
 	
-	private static final String login = "ALSTOMTED";
-//	private static final String login = "BLA";
-	private static final String passw = "SALESFORCE2015";
-//	private static final String passw = "wrong";
-	
     boolean loginOk = false;
 
-    WebDriver driver;
-
 	public ComprasNet(String baseURL, String projectId, Listener listener) {
-		super(baseURL, projectId, listener);
-		
-		driver = new FirefoxDriver();
+		super(new FirefoxDriver(), baseURL, projectId, listener);
 	}
 
     @Override
 	public void load() {
+        logger.debug("Loading: {}", baseURL);
     
         boolean success = false;
         for (int retry = 0; retry < 3 && success == false; ++retry) {
-        	System.out.println("Try: " + retry);
+			logger.debug("Loading. Try: " + retry);
         	driver.get(baseURL);
         	try {
 	        	success = (new WebDriverWait(driver, 1)).until(new ExpectedCondition<Boolean>() {
@@ -64,24 +58,31 @@ public class ComprasNet extends Site {
         }
         
         if (success) {
+            logger.debug("Page load successfully");
         	listener.onPageLoadSuccess();
         } else {
+			logger.error("Load error: Could not load page.");
         	listener.onPageLoadFail("Could not load page.");
         }
 	}
 	
 	public void login() {
+        logger.debug("Login: {}", username);
+        
         String mainWindowId = driver.getWindowHandle();
 
         // Fill login data
+        logger.debug("Setting perfil type");
     	WebElement elPerfil  = driver.findElement(By.id(idPerfil));
         new Select(elPerfil).selectByVisibleText(textFornecedor);
         WebElement elLogin = driver.findElement(By.id(idLogin));
         WebElement elSenha = driver.findElement(By.id(idSenha));
-        elLogin.sendKeys(login);
-        elSenha.sendKeys(passw);
+        logger.debug("Filling username and password");
+        elLogin.sendKeys(username);
+        elSenha.sendKeys(password);
 
         // Click "acessar"
+        logger.debug("Submitting login");
         WebElement elAcessar = driver.findElement(By.id(idAcessar));
         elAcessar.click();
        
@@ -101,34 +102,48 @@ public class ComprasNet extends Site {
         if (loginOk == false) {
     		WebElement elErrorMsg = driver.findElement(By.className(classError));
     		if (elErrorMsg == null) {
+    			logger.error("Could not load page.");
     			listener.onLoginFail("Could not load page.");
     		} else {
+    			logger.error("Login error: {}", elErrorMsg.getText());
     			listener.onLoginFail(elErrorMsg.getText());
     		}
 
     		driver.close();
     		return;
         }
-        
-        System.out.println("Login succeeded! Continuing...");
+		logger.debug("Login succeeded!");
 
+		logger.debug("Closing pop-ups...");
         Set<String> windowSet = driver.getWindowHandles();
         for (String windowId : windowSet) {
         	if (windowId.equals(mainWindowId) == false) {
         		driver.switchTo().window(windowId);
-                System.out.println("Window ID: " + windowId + ": " + driver.getTitle() + ": pop-up closed!");
+        		logger.debug("  Window ID: {}: {}: pop-up closed!", windowId, driver.getTitle());
         		driver.close();
         	}
         }
 
         driver.switchTo().window(mainWindowId);
-
+        logger.debug("Login successfull.");
         listener.onLoginSuccess();
 	}
 
 	@Override
 	public void close() {
+		logger.debug("Closing WebDriver");
 	    driver.quit();
+	}
+
+	@Override
+	public void openProject() {
+		logger.debug("Opening project");
+		
+//		div[id="Header"].div[0].div[0]
+
+		listener.onOpenProjectSuccess();
+		listener.onOpenProjectFail("Error message!!");
+		listener.onAuctionModeChanged(mode);
 	}
 
 }
