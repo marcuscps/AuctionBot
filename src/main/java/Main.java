@@ -32,14 +32,25 @@ class Main {
 
 			@Override
 			public void onLoginSuccess() {
-				logger.info("Loged in!");
-//				site.close();
+				logger.info("Loged in");
+				site.openProject();
 			}
 			
 			@Override
 			public void onLoginFail(String message) {
 				logger.error("Login error: {}", message);
-//				site.close();
+			}
+			
+			@Override
+			public void onOpenProjectSuccess() {
+				logger.info("Project opened");
+				site.close();
+			}
+			
+			@Override
+			public void onOpenProjectFail(String message) {
+				logger.error("Open Project error: {}", message);
+				site.close();
 			}
 			
 			@Override
@@ -64,14 +75,6 @@ class Main {
 			
 			@Override
 			public void onPlaceBidFail(long value, String message) {
-			}
-			
-			@Override
-			public void onOpenProjectSuccess() {
-			}
-			
-			@Override
-			public void onOpenProjectFail(String message) {
 			}
 			
 			@Override

@@ -1,12 +1,15 @@
 package sites;
+import org.slf4j.Logger;
 import org.openqa.selenium.WebDriver;
 
 import auction.Auction;
 import auction.Auction.AuctionMode;
 import auction.Bid;
-
+	
 public abstract class Site {
 
+	public abstract Logger getLogger();
+	
 	public interface Listener {
 		void onPageLoadSuccess();
 		void onPageLoadFail(String message);
@@ -57,7 +60,10 @@ public abstract class Site {
 
 	public abstract void load();
 
-	public abstract void close();
+	public void close() {
+		getLogger().debug("Closing WebDriver");
+	    driver.quit();
+	}
 
 	public void setLogin(String username, String password) {
 		this.username = username;
