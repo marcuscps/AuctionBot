@@ -1,10 +1,12 @@
 import auction.Auction.AuctionMode;
-import sites.ComprasNet;
 import sites.Site;
 import sites.Site.Listener;
+import sites.comprasNet.ComprasNet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import config.Config;
 
 class Main {
 	private Site site;
@@ -33,7 +35,7 @@ class Main {
 			@Override
 			public void onLoginSuccess() {
 				logger.info("Loged in");
-				site.openProject();
+				site.openProject("project1");
 			}
 			
 			@Override
@@ -44,60 +46,91 @@ class Main {
 			@Override
 			public void onOpenProjectSuccess() {
 				logger.info("Project opened");
-				site.close();
+				site.startMonitor();
 			}
 			
 			@Override
 			public void onOpenProjectFail(String message) {
 				logger.error("Open Project error: {}", message);
-				site.close();
-			}
-			
-			@Override
-			public void onStopMonitorSuccess() {
-			}
-			
-			@Override
-			public void onStopMonitorFail(String message) {
 			}
 			
 			@Override
 			public void onStartMonitorSuccess() {
+				logger.info("Project being monitored from now on");
 			}
 			
 			@Override
 			public void onStartMonitorFail(String message) {
+				logger.error("Start Monitor error: {}", message);
+			}
+
+			@Override
+			public void onStopMonitorSuccess() {
+				logger.info("Project not being monitored anymore");
 			}
 			
 			@Override
-			public void onPlaceBidSuccess(long value) {
+			public void onStopMonitorFail(String message) {
+				logger.error("Stop Monitor error: {}", message);
 			}
-			
+		
 			@Override
-			public void onPlaceBidFail(long value, String message) {
-			}
-			
-			@Override
-			public void onLeadingBidChanged(boolean ours, long value) {
+			public void onMonitorFail(String message) {
+				logger.error("Monitor error: {}", message);
 			}
 			
 			@Override
 			public void onAuctionStarted() {
+				logger.info("Auction started");
 			}
 			
 			@Override
-			public void onAuctionModeChanged(AuctionMode mode) {
+			public void onPlaceBidSuccess(long value) {
+				logger.info("BID placed successfully: {}", value);
+			}
+			
+			@Override
+			public void onPlaceBidFail(long value, String message) {
+				logger.error("BID place error: VALUE: {} - REASON: {}", value, message);
+			}
+			
+			@Override
+			public void onLeadingBidChanged(boolean ours, long value) {
+				logger.info("Leading bid changed: OURS: {} - VALUE: {}", ours, value);
+			}
+			
+			@Override
+			public void onAuctionModeChanged(String id, AuctionMode mode) {
+				logger.info("Auction mode changed: ID: {} - MODE: {}", id, mode);
 			}
 			
 			@Override
 			public void onAuctionEnded() {
+				logger.info("Auction ended");
 			}
 		};
-
 		
 		site = new ComprasNet("https://www.comprasnet.gov.br/seguro/loginPortal.asp", "1", listener);
-		site.setLogin("ALSTOMTED", "SALESFORCE2015");
-//		site.setLogin("BLA", "BLE");
-		site.load();
+
+		if (Config.UseValidUserInfo) {
+			site.setLogin("ALSTOMTED", "SALESFORCE2015");
+		} else {
+			site.setLogin("BLA", "BLE");
+		}
+				
+		if (Config.TestMode) {
+			site.openProject("FAKE");
+			
+			logger.info("Back to main...");
+
+			try { Thread.sleep(5000); } catch (InterruptedException e) { }
+	
+		} else {
+			site.load();
+
+			try { Thread.sleep(20000); } catch (InterruptedException e) { }
+		}
+		
+		site.close();
 	}
 }

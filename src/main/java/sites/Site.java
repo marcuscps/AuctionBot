@@ -19,11 +19,12 @@ public abstract class Site {
 		void onOpenProjectFail(String message);
 		void onStartMonitorSuccess();
 		void onStartMonitorFail(String message);
+		void onMonitorFail(String message);
 		void onStopMonitorSuccess();
 		void onStopMonitorFail(String message);
 		void onAuctionStarted();
 		void onAuctionEnded();
-		void onAuctionModeChanged(AuctionMode mode);
+		void onAuctionModeChanged(String id, AuctionMode mode);
 		void onLeadingBidChanged(boolean ours, long value);
 		void onPlaceBidSuccess(long value);
 		void onPlaceBidFail(long value, String message);
@@ -61,7 +62,9 @@ public abstract class Site {
 	public abstract void load();
 
 	public void close() {
-		getLogger().debug("Closing WebDriver");
+    	this.stopMonitor();
+
+    	getLogger().debug("Closing WebDriver");
 	    driver.quit();
 	}
 
@@ -72,29 +75,11 @@ public abstract class Site {
 	
 	public abstract void login();
 
-	public abstract void openProject();
+	public abstract void openProject(String projectId);
 
-	public void startMonitor() {
-		// TODO
-		listener.onStartMonitorSuccess();
-		listener.onStartMonitorFail("Error message!!");
-		mode = AuctionMode.Normal;
-		listener.onAuctionStarted();
-		listener.onAuctionModeChanged(mode);
-		mode = AuctionMode.RandomClosingTime;
-		listener.onAuctionModeChanged(mode);
-		listener.onLeadingBidChanged(true, 100);
-		listener.onLeadingBidChanged(false, 100);
-		mode = AuctionMode.Closed;
-		listener.onAuctionModeChanged(mode);
-		listener.onAuctionEnded();
-	}
+	public abstract void startMonitor();
 
-	public void stopMonitor() {
-		// TODO
-		listener.onStopMonitorSuccess();
-		listener.onStopMonitorFail("Error message!!");
-	}
+	public abstract void stopMonitor();
 
 	public void placeBid(long value) {
 		// TODO
@@ -102,7 +87,7 @@ public abstract class Site {
 		listener.onPlaceBidFail(value, "Error message!!");
 	}
 
-    WebDriver driver;
+    protected WebDriver driver;
     
 	protected String baseURL;
 	protected String username;

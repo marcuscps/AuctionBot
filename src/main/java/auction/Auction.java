@@ -22,6 +22,7 @@ public class Auction {
 
 	public enum AuctionMode {
 		Idle,
+		Waiting,
 		Normal,
 		RandomClosingTime,
 		Closed
