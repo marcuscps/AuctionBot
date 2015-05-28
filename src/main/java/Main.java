@@ -1,3 +1,7 @@
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+
 import auction.Auction.AuctionMode;
 import sites.Site;
 import sites.Site.Listener;
@@ -120,17 +124,23 @@ class Main {
 				
 		if (Config.TestMode) {
 			site.openProject("FAKE");
-			
-			logger.info("Back to main...");
-
-			try { Thread.sleep(5000); } catch (InterruptedException e) { }
-	
 		} else {
 			site.load();
-
-			try { Thread.sleep(20000); } catch (InterruptedException e) { }
 		}
+
+		logger.info("Back to main...");
 		
+		String input = "";
+		try {
+			BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+			System.out.println("Press enter to quit");
+			input = reader.readLine();
+		} catch (IOException e) {
+			logger.error("Error reading from console.", e);
+		}
+
 		site.close();
+
+		System.out.println("You entered: \"" + input + "\". Exiting...");
 	}
 }

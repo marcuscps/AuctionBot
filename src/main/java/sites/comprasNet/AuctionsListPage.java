@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import javax.management.RuntimeErrorException;
+
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.TimeoutException;
@@ -18,8 +20,8 @@ import org.slf4j.LoggerFactory;
 public class AuctionsListPage extends sites.SitePage {
 	static Logger logger = LoggerFactory.getLogger(AuctionsListPage.class);
 
-	private static final String xpathCadastramento	= "//img[@src='T_cadastramento_lances.gif']";
-
+	private static final String xpathCadastramento	= "//table/tbody/tr[2]/td/table[1]/tbody/tr/td[2]/table/tbody/tr[1]/td[1]/img";
+	
 	private static final String nameContentFrame	= "main2";
 
 	private static final String xpathItemsTable	= "//body/table/tbody/tr[2]/td/table[2]/tbody/tr[3]/td[2]/table/tbody";
@@ -54,6 +56,13 @@ public class AuctionsListPage extends sites.SitePage {
 		
 		try {
 			WebElement elItemsTable = driver.findElement(By.xpath(xpathItemsTable));
+
+			try {
+				WebElement errorMsg = elItemsTable.findElement(By.className("mensagem"));
+				throw new RuntimeException(errorMsg.getText());
+			} catch (NoSuchElementException e) {
+				logger.debug("At least one auction is available");
+			}
 
 			List<WebElement> items = elItemsTable.findElements(By.xpath(".//tr[position() > 1]"));
 			for (WebElement elItem : items) {
