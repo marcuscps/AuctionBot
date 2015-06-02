@@ -1,5 +1,11 @@
 package sites.comprasNet;
 
+import java.security.InvalidParameterException;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.openqa.selenium.firefox.FirefoxDriver;
@@ -27,6 +33,79 @@ public class ComprasNet extends Site implements MonitorListener {
     private boolean keepMonitorAlive = false;
     private AuctionMode auctionMode = AuctionMode.Idle;
     
+    private List<Runnable> pendingCommands = new LinkedList<>();
+    private Map<String, Item> items = new HashMap<String, Item>();
+
+	private boolean updated;
+    
+    private class Item {
+    	private boolean winning;
+    	private String id;
+    	private String description;
+    	private boolean opened;
+    	private boolean randomFinish;
+    	private long myBid;
+    	private long bestBid;
+    	private long limitLower = -1;
+    	private long limitUpper = -1;
+
+    	Item (boolean winning, String id, String description, boolean opened, boolean randomFinish, long myBid, long bestBid) {
+    		this.winning = winning;
+    		this.id = id;
+    		this.description = description;
+    		this.opened = opened;
+    		this.randomFinish = randomFinish;
+    		this.myBid = myBid;
+    		this.bestBid = bestBid;
+
+//    		logger.debug("New Item:\n" + "    WINNING:     {}\n" + "    ID:          {}\n" + "    DESCRIPTION: \"{}\"\n" +
+//    				"    OPENED:      {}\n" + "    RANDOM:      {}\n" + "    MINE:        {}\n" + "    BEST:        {}",
+//    				winning, id, description, opened, randomFinish, myBid, bestBid);
+    	}
+
+		public String getId() {
+			return id;
+		}
+		
+		public void setLowerLimit(long value) {
+			limitLower = value;
+			logger.debug("Lower limit for {} set to {}", id, limitLower);
+		}
+
+		public long getLowerLimit() {
+			return limitLower;
+		}
+		
+		public void setUpperLimit(long value) {
+			limitUpper = value;
+			logger.debug("Upper limit for {} set to {}", id, limitUpper);
+		}
+
+		public long getUpperLimit() {
+			return limitUpper;
+		}
+		
+		public boolean isBidValid(long value) {
+			return (value >= limitLower && value <= limitUpper);			
+		}
+
+		public boolean update(boolean winning, boolean opened, boolean randomFinish, long myBid, long bestBid) {
+			boolean changed = false;
+			if (this.winning != winning)			{	this.winning = winning;				changed = true; }
+			if (this.opened != opened)				{	this.opened = opened;				changed = true;	}
+			if (this.randomFinish != randomFinish)	{	this.randomFinish = randomFinish;	changed = true;	}
+			if (this.myBid != myBid)				{	this.myBid = myBid;					changed = true;	}
+			if (this.bestBid != bestBid)			{	this.bestBid = bestBid;				changed = true;	}
+			return changed;
+		}
+		
+		public String toString() {
+			return String.format("%-8s    %-8s    %-30s    %-8s    %-8s    %-8s    %-8s",
+					id, winning, description, opened, randomFinish, myBid, bestBid);
+		}
+		
+    }
+    
 	public ComprasNet(String baseURL, String projectId, Listener listener) {
 		super(new FirefoxDriver(), baseURL, projectId, listener);
 		pageAuction.setListener(this);
@@ -37,7 +116,18 @@ public class ComprasNet extends Site implements MonitorListener {
 		return logger;
 	}
 
-    @Override
+	private synchronized void addCommand(boolean cancelAll, Runnable command) {
+		if (cancelAll == true) pendingCommands.clear();
+		pendingCommands.add(command);		
+		logger.debug("Notifying monitor thread");
+		notifyAll();
+	}
+
+	//==============================================================================================
+	// Site commands
+	//==============================================================================================
+
+	@Override
 	public synchronized void load() {
     	try {
 	        logger.debug("Loading: {}", baseURL);
@@ -158,7 +248,8 @@ public class ComprasNet extends Site implements MonitorListener {
         		success = false;
 		        for (int retry = 0; retry < 3 && success == false; ++retry) {
 					logger.debug("Loading. Try: " + retry);
-		        	driver.get("file:///D:/Arquivos/Desktop/Lances/1_Entrei/Preg%C3%A3o%20Eletr%C3%B4nico.html");
+//		        	driver.get("file:///D:/Arquivos/Desktop/Lances/1_Entrei/Preg%C3%A3o%20Eletr%C3%B4nico.html");
+		        	driver.get("file:///D:/Arquivos/Desktop/Lances/7_OutrosAbertos/Preg%C3%A3o%20Eletr%C3%B4nico.html");
 		        	success = pageAuction.isLoaded(driver);
 		        }
 		        if (success == false) {
@@ -215,6 +306,10 @@ public class ComprasNet extends Site implements MonitorListener {
 		}
 	}
 
+	//==============================================================================================
+	// Monitor thread commands
+	//==============================================================================================
+
 	@Override
 	public synchronized void startMonitor() {
 		logger.debug("Start monitor requested");
@@ -241,9 +336,7 @@ public class ComprasNet extends Site implements MonitorListener {
 		while (true) {
 			try {
 				synchronized (this) {
-					logger.debug("Notifying monitor thread");
-					keepMonitorAlive = false;
-					notifyAll();
+					addCommand(true, new Runnable() { @Override public void run() { executeStopMonitor(); }});
 				}
 				
 				logger.debug("Waiting monitor thread to finish");
@@ -263,6 +356,60 @@ public class ComprasNet extends Site implements MonitorListener {
 		listener.onStopMonitorSuccess();
 	}
 
+	//==============================================================================================
+	// Action commands
+	//==============================================================================================
+
+	@Override
+	public void refresh() {
+		synchronized (this) {
+			logger.debug("Notifying monitor thread");
+			notifyAll();
+		}
+	}
+	
+	@Override
+	public synchronized void placeBid(final String id, long value) {
+		if (value < 0) throw new InvalidParameterException("Value must be positive.");
+
+		final Item item = items.get(id);
+		if (item == null) {
+			throw new RuntimeException("No element with such ID.");
+		}
+		
+		if (item.isBidValid(value) == false) {
+			throw new RuntimeException("Bid is not within the acceptable range: [" + item.getLowerLimit() + ", " + item.getUpperLimit());
+		}
+		
+		addCommand(false, new Runnable() { @Override public void run() { executePlaceBid(item, value); }});
+	}
+	
+	//==============================================================================================
+	// Command executors
+	//==============================================================================================
+	
+	private void executeStopMonitor() {
+		keepMonitorAlive = false;							
+	}
+
+	private void executePlaceBid(Item item, long value) {
+		if (currentPage != pageAuction) {
+			listener.onPlaceBidFail(item.getId(), value, "Error message!!");
+			return;
+		}
+		
+		try {
+			pageAuction.placeBid(driver, item.getId(), value);
+			listener.onPlaceBidSuccess(item.getId(), value);
+		} catch (Exception e) {
+			listener.onPlaceBidFail(item.getId(), value, e.getMessage());
+		}
+	}
+
+	//==============================================================================================
+	// Monitor thread events
+	//==============================================================================================
+
 	private synchronized void onMonitorStarted() {
 		logger.debug("Monitor thread has started");
 		auctionMode = AuctionMode.Waiting;
@@ -270,7 +417,7 @@ public class ComprasNet extends Site implements MonitorListener {
 		listener.onStartMonitorSuccess();
 	}
 	
-	public synchronized void onMonitorFail(String message, boolean fatal) {
+	private synchronized void onMonitorFail(String message, boolean fatal) {
 		logger.error("Error monitoring:", message);
 		listener.onMonitorFail(message);
 		if (fatal) {
@@ -278,7 +425,7 @@ public class ComprasNet extends Site implements MonitorListener {
 		}
 	}
 
-	public synchronized void onMonitorStopped() {
+	private synchronized void onMonitorStopped() {
 		logger.debug("Monitor thread has stopped");
 		auctionMode = AuctionMode.Idle;
 		listener.onAuctionModeChanged("", auctionMode);
@@ -295,15 +442,14 @@ public class ComprasNet extends Site implements MonitorListener {
 
 	@Override
 	public synchronized void onItemInfo(boolean winning, String id, String description, boolean opened, boolean randomFinish, long myBid, long bestBid) {
-		logger.debug("Item Info:\n" +
-				"    WINNING:     {}\n" +
-				"    ID:          {}\n" +
-				"    DESCRIPTION: \"{}\"\n" +
-				"    OPENED:      {}\n" +
-				"    RANDOM:      {}\n" +
-				"    MINE:        {}\n" +
-				"    BEST:        {}",
-				winning, id, description, opened, randomFinish, myBid, bestBid);
+		Item item = items.get(id);
+		if (item == null) {
+			item = new Item(winning, id, description, opened, randomFinish, myBid, bestBid);
+			items.put(id, item);
+			updated = true;
+		} else {
+			updated |= item.update(winning, opened, randomFinish, myBid, bestBid);
+		}
 
 		if (opened) {
 			AuctionMode lastMode = auctionMode;
@@ -324,6 +470,26 @@ public class ComprasNet extends Site implements MonitorListener {
 		logger.debug("New message: FROM: {} - MESSAGE: {}", sender, message);
 	}
 
+	@Override
+	public void onMonitorDone() {
+		if (updated) {
+			logger.info("Items (updated): {}", items.size());
+			String header1 = String.format("    %-8s    %-8s    %-30s    %-8s    %-8s    %-8s    %-8s", "ID", "WINNING", "DESCRIPTION", "OPENED", "RANDOM", "MY BID", "BEST BID");
+			String header2 = "    " + String.format("%" + (header1.length() - 4) + "s", "").replace(' ', '=');
+			logger.info(header1);
+			logger.info(header2);
+			for(Entry<String, Item> entry : items.entrySet()) {
+				logger.info("    {}", entry.getValue().toString());
+				
+			}
+		}
+		updated = false;
+	}
+
+	//==============================================================================================
+	// Monitor thread
+	//==============================================================================================
+
 	private class MonitorThread implements Runnable {
 		@Override
 		public void run() {
@@ -336,7 +502,11 @@ public class ComprasNet extends Site implements MonitorListener {
 						while (keepMonitorAlive) {
 							try {
 								logger.debug("Monitor: sleeping (timer)");
-								ComprasNet.this.wait(1000);
+								if (refreshRate == -1) {
+									ComprasNet.this.wait();
+								} else {
+									ComprasNet.this.wait(refreshRate);
+								}
 								logger.debug("Monitor: Woke up.");
 								break;
 							} catch (InterruptedException e) {
@@ -345,12 +515,23 @@ public class ComprasNet extends Site implements MonitorListener {
 						}
 
 						if (keepMonitorAlive == false) break;
-					}
 
-					try {
-						onMonitor();
-					} catch (Exception e) {
-						onMonitorFail(e.getMessage(), false);
+						if (pendingCommands.isEmpty() == false) {
+							logger.debug("Executing {} pending commands...", pendingCommands.size());
+							for (Runnable command : pendingCommands) {
+								command.run();
+								if (keepMonitorAlive == false) break;
+							}
+							pendingCommands.clear();
+						}
+
+						if (keepMonitorAlive == false) break;
+
+						try {
+							onMonitor();
+						} catch (Exception e) {
+							onMonitorFail(e.getMessage(), false);
+						}
 					}
 				}
 			} catch (Exception e) {
@@ -360,6 +541,32 @@ public class ComprasNet extends Site implements MonitorListener {
 			logger.debug("Monitor: Finishing up");
 			onMonitorStopped();			
 		}
+	}
+
+	@Override
+	public synchronized void setLowerLimit(String id, long value) {
+		if (value < 0) throw new InvalidParameterException("Lower limit must be positive.");
+
+		Item item = items.get(id);
+		if (item == null) {
+			throw new RuntimeException("No element with such ID.");
+		}
+
+		item.setLowerLimit(value);
+		this.refresh();
+	}
+
+	@Override
+	public synchronized void setUpperLimit(String id, long value) {
+		if (value < 0) throw new InvalidParameterException("Higher limit must be positive.");
+
+		Item item = items.get(id);
+		if (item == null) {
+			throw new RuntimeException("No element with such ID.");
+		}
+
+		item.setUpperLimit(value);
+		this.refresh();
 	}
 
 }

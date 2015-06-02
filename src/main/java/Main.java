@@ -1,15 +1,17 @@
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.security.InvalidParameterException;
 
-import auction.Auction.AuctionMode;
-import sites.Site;
-import sites.Site.Listener;
-import sites.comprasNet.ComprasNet;
+import javax.swing.JOptionPane;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import sites.Site;
+import sites.Site.Listener;
+import sites.comprasNet.ComprasNet;
+import auction.Auction.AuctionMode;
 import config.Config;
 
 class Main {
@@ -89,13 +91,13 @@ class Main {
 			}
 			
 			@Override
-			public void onPlaceBidSuccess(long value) {
-				logger.info("BID placed successfully: {}", value);
+			public void onPlaceBidSuccess(String id, long value) {
+				logger.info("BID placed successfully: id: {} - value: {}", id, value);
 			}
 			
 			@Override
-			public void onPlaceBidFail(long value, String message) {
-				logger.error("BID place error: VALUE: {} - REASON: {}", value, message);
+			public void onPlaceBidFail(String id, long value, String message) {
+				logger.error("BID place error: ID: {} - VALUE: {} - REASON: {}", id, value, message);
 			}
 			
 			@Override
@@ -128,19 +130,205 @@ class Main {
 			site.load();
 		}
 
-		logger.info("Back to main...");
 		
-		String input = "";
-		try {
-			BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-			System.out.println("Press enter to quit");
-			input = reader.readLine();
-		} catch (IOException e) {
-			logger.error("Error reading from console.", e);
-		}
+		logger.info("Back to main...");
+//		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+		boolean waitForCommands = true;
+		do {
+			try {
+//				System.out.println("Press enter to quit");
+//				String input = reader.readLine();
+				String input = getCommand();
+				if (input == null) continue;
+				
+				String command = "";
+				int separator = input.indexOf(' ');
+				if (separator != -1) {
+					command = input.substring(0, separator);
+					input = input.substring(separator + 1);
+					logger.debug("Command: \"{}\" - Complement: \"{}\"", command, input);
+				} else {
+					command = input;
+					logger.debug("Command: \"{}\"", command);
+				}
+				
+				boolean error = false;
+				command.toUpperCase();
+				switch (command) {
+				case "R":
+					logger.info("Refresing...");
+					site.refresh();
+					break;
+					
+				case "B":
+					if (input.length() > 0) {
+						try {
+							String []params = input.split(" ");
+							if (params.length != 2) {
+								throw new InvalidParameterException("Command takes 2 parameters.");
+							}
+							String id = params[0];
+							String valueStr = getMultiplyBy10000(params[1]) ? params[1] + "0000" : params[1];
+							long value = Long.parseLong(valueStr);
+							logger.info("Placing Bid: id = {}, value = {}", id, value);
+							site.placeBid(id, value);
+						} catch (NumberFormatException e) {
+							logger.error("Invalid parameter.");
+							error = true;
+						} catch (InvalidParameterException e) {
+							logger.error("Invalid parameter: {}", e.getMessage());
+							error = true;
+						} catch (RuntimeException e) {
+							logger.error("Error: {}", e.getMessage());
+							error = true;
+						}
+					} else {
+						logger.error("Parameter required.");
+						error = true;
+					}
+					if (error) {
+						logger.info("    Syntax: B <id> <value>");
+						logger.info("      It will place a Bid.");
+					}
+					break;
+					
+				case "L":
+					if (input.length() > 0) {
+						try {
+							String []params = input.split(" ");
+							if (params.length != 2) {
+								throw new InvalidParameterException("Command takes 2 parameters.");
+							}
+							String id = params[0];
+							String valueStr = getMultiplyBy10000(params[1]) ? params[1] + "0000" : params[1];
+							long value = Long.parseLong(valueStr);
+							logger.info("Setting Lower Limit to {} for {}", value, id);
+							site.setLowerLimit(id, value);
+						} catch (NumberFormatException e) {
+							logger.error("Invalid parameter.");
+							error = true;
+						} catch (InvalidParameterException e) {
+							logger.error("Invalid parameter: {}", e.getMessage());
+							error = true;
+						} catch (RuntimeException e) {
+							logger.error("Error: {}", e.getMessage());
+							error = true;
+						}
+					} else {
+						logger.error("Parameter required.");
+						error = true;
+					}
+					if (error) {
+						logger.info("    Syntax: L <id> <value>");
+						logger.info("      It will set the Lower Limit.");
+					}
+					break;
+										
+				case "U":
+					if (input.length() > 0) {
+						try {
+							String []params = input.split(" ");
+							if (params.length != 2) {
+								throw new InvalidParameterException("Command takes 2 parameters.");
+							}
+							String id = params[0];
+							String valueStr = getMultiplyBy10000(params[1]) ? params[1] + "0000" : params[1];
+							long value = Long.parseLong(valueStr);
+							logger.info("Setting Upper Limit to {} for {}", value, id);
+							site.setUpperLimit(id, value);
+						} catch (NumberFormatException e) {
+							logger.error("Invalid parameter.");
+							error = true;
+						} catch (InvalidParameterException e) {
+							logger.error("Invalid parameter: {}", e.getMessage());
+							error = true;
+						} catch (RuntimeException e) {
+							logger.error("Error: {}", e.getMessage());
+							error = true;
+						}
+					} else {
+						logger.error("Parameter required.");
+						error = true;
+					}
+					if (error) {
+						logger.info("    Syntax: U <id> <value>");
+						logger.info("      It will set Higher Limit.");
+					}
+					break;
+										
+				case "T":
+					if (input.length() > 0) {
+						try {
+							int value = Integer.parseInt(input);
+							logger.info("Setting Refresh Rate to {}", value);
+							site.setRefreshRate(value);
+						} catch (NumberFormatException e) {
+							logger.error("Invalid parameter.");
+							error = true;
+						} catch (RuntimeException e) {
+							logger.error("Error: {}", e.getMessage());
+							error = true;
+						}
+					} else {
+						logger.error("Parameter required.");
+						error = true;
+					}
+					if (error) {
+						logger.info("    Syntax: T <value>");
+						logger.info("      It will set Refresh Rate.");
+					}
+					break;
+										
+				case "Q":
+					logger.info("Quit requested.");
+					waitForCommands = false;
+					break;
+				
+				case "?":
+				default:
+					logger.error("Invalid command.");
+					logger.info("\tR                     Refresh");
+					logger.info("\tB <id> <value>        Place a bid.");
+					logger.info("\tL <id> <value>        Set lower limit.");
+					logger.info("\tH <id> <value>        Set higher limit.");
+					logger.info("\tT <value>             Adjust refresh rate.");
+					logger.info("\tQ                     Quit.");
+					break;
+				}
+//			} catch (IOException e) {
+//				logger.error("Error reading from console.", e);
+			} catch (Exception e) {
+				logger.error("Error reading or executing command.", e);
+			}
+		} while (waitForCommands);
 
+		logger.info("Quitting...");
 		site.close();
+	}
+	
+	String getCommand() {
+		return (String)JOptionPane.showInputDialog(
+		                    null, //frame,
+		                    "R                                 Refresh\n" +
+		                    "B <id> <value>        Place a bid.\n" + 
+							"L <id> <value>        Set lower limit.\n" +
+							"H <id> <value>        Set higher limit.\n" +
+							"T <value>                 Adjust refresh rate.\n" +
+							"Q                                Quit.\n",
+		                    "Type a command",
+		                    JOptionPane.PLAIN_MESSAGE,
+		                    null, // icon,
+		                    null, // possibilities,
+		                    "Q"); // default
+	}
 
-		System.out.println("You entered: \"" + input + "\". Exiting...");
+	boolean getMultiplyBy10000(String value) {
+		return 0 == JOptionPane.showConfirmDialog(
+			    null, // frame,
+			    "You typed: " + value + "\n\n" +
+			    "Attention, values are in 1/1000 of a currency unit.\n" +
+			    "Multiply it automatically by 10000?",
+			    "Be carefull with cents!!",
+			    JOptionPane.YES_NO_OPTION);
 	}
 }

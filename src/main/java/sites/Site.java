@@ -1,6 +1,9 @@
 package sites;
+import java.security.InvalidParameterException;
+
 import org.slf4j.Logger;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.remote.UnreachableBrowserException;
 
 import auction.Auction;
 import auction.Auction.AuctionMode;
@@ -26,8 +29,8 @@ public abstract class Site {
 		void onAuctionEnded();
 		void onAuctionModeChanged(String id, AuctionMode mode);
 		void onLeadingBidChanged(boolean ours, long value);
-		void onPlaceBidSuccess(long value);
-		void onPlaceBidFail(long value, String message);
+		void onPlaceBidSuccess(String id, long value);
+		void onPlaceBidFail(String id, long value, String message);
 	}
 
 	public Site(WebDriver driver, String baseURL, String projectId, Listener listener) {
@@ -65,7 +68,11 @@ public abstract class Site {
     	this.stopMonitor();
 
     	getLogger().debug("Closing WebDriver");
-	    driver.quit();
+    	try {
+    		driver.quit();
+    	} catch (UnreachableBrowserException e) {
+    		getLogger().info("Looks like the browser window was closed manually.");
+    	}
 	}
 
 	public void setLogin(String username, String password) {
@@ -81,11 +88,18 @@ public abstract class Site {
 
 	public abstract void stopMonitor();
 
-	public void placeBid(long value) {
-		// TODO
-		listener.onPlaceBidSuccess(value);
-		listener.onPlaceBidFail(value, "Error message!!");
+	public abstract void refresh();
+
+	public void setRefreshRate(int value) {
+		if (value < 0) throw new InvalidParameterException("Refresh Rate must be positive.");
+		this.refreshRate = value;
 	}
+
+	public abstract void setLowerLimit(String id, long value);
+
+	public abstract void setUpperLimit(String id, long value);
+
+	public abstract void placeBid(String id, long value);
 
     protected WebDriver driver;
     
@@ -96,4 +110,6 @@ public abstract class Site {
 	protected Listener listener;
 	protected AuctionMode mode;
 	protected Bid leadingBid;
+	protected int refreshRate = 5000;
 }
+

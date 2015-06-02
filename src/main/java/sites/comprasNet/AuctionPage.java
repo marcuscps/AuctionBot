@@ -22,6 +22,8 @@ public class AuctionPage extends sites.SitePage {
 		void onNewMessage(String sender, String message);
 
 		void onItemInfo(boolean winning, String id, String description, boolean opened, boolean randomFinish, long myBid, long bestBid);
+
+		void onMonitorDone();
 	}
 
 	private static final String titlePregaoEletronico	= "Pregão Eletrônico";
@@ -102,6 +104,7 @@ public class AuctionPage extends sites.SitePage {
 	public void monitor(WebDriver driver) {
 		refreshMessages(driver);
 		refreshAuction(driver);
+		listener.onMonitorDone();
 	}
 
 	private long extractBidValueFromHTML(String bidHtml) {
@@ -124,54 +127,8 @@ public class AuctionPage extends sites.SitePage {
 
 			List<WebElement> items = elItemsTable.findElements(By.xpath(".//tr[position() > 1]"));
 			for (WebElement elItem : items) {
-				WebElement elWinning = elItem.findElement(By.xpath(".//td[1]/img"));
-				String strWinning = elWinning.getAttribute("src");
-				boolean winning = ("LanceNaoVencedor.git".equals(strWinning));
-
-				WebElement elId = elItem.findElement(By.xpath(".//td[2]/a"));
-				String id = elId.getText();
-				
-				WebElement elDescription = elItem.findElement(By.xpath(".//td[4]/a"));
-				String description = elDescription.getText();
-				
-				boolean opened = false;
-				boolean randomFinish = false;
-				WebElement elSitutation = elItem.findElement(By.xpath(".//td[5]"));
-				String strSituation = elSitutation.getText();
-				switch (strSituation) {
-				case "Fechado":
-					opened = false;
-					randomFinish = false;
-					break;
-				case "Aviso de Iminência":
-					opened = true;
-					randomFinish = false;
-					break;
-				case "Encerramento Aleatório":
-					opened = true;
-					randomFinish = true;
-					break;
-				case "Em desempate ME/EPP":
-					// TODO
-					break;
-				case "Aguardando convocação ME/EPP":
-					// TODO
-					break;
-				case "Encerrado":
-					opened = false;
-					randomFinish = false;
-					break;
-				}
-				
-				WebElement elMyBid = elItem.findElement(By.xpath(".//td[6]"));
-				String htmlMyBid = elMyBid.getAttribute("innerHTML");
-				long myBid = extractBidValueFromHTML(htmlMyBid);
-				
-				WebElement elBestBid = elItem.findElement(By.xpath(".//td[7]"));
-				String htmlBestBid = elBestBid.getAttribute("innerHTML");
-				long bestBid = extractBidValueFromHTML(htmlBestBid);
-				
-				listener.onItemInfo(winning, id, description, opened, randomFinish, myBid, bestBid);
+				ElementInfo elInfo = new ElementInfo(elItem);
+				listener.onItemInfo(elInfo.winning, elInfo.id, elInfo.description, elInfo.opened, elInfo.randomFinish, elInfo.myBid, elInfo.bestBid);
 			}
 
 		} catch (NoSuchElementException e) {
@@ -235,4 +192,104 @@ public class AuctionPage extends sites.SitePage {
 		this.expectedAuctionId = actionId;
 	}
 
+	public void placeBid(WebDriver driver, String id, long value) {
+		selectContentFrame(driver);
+		
+		try {
+			WebElement elItemsTable = driver.findElement(By.xpath(xpathItemsTable));
+
+			List<WebElement> items = elItemsTable.findElements(By.xpath(".//tr[position() > 1]"));
+			for (WebElement elItem : items) {
+				ElementInfo info = new ElementInfo(elItem);
+				if (id.equals(info.id)) {
+					logger.debug("Found element!");
+					WebElement elBid = info.getPlaceBidElement();
+					WebElement elSend = info.getPlaceBidButtonElement();
+					
+					long cents = value % 10000;
+					long fixed = value / 10000;
+					
+					String valueStr = String.format("%d,%04d", fixed, cents);
+					logger.debug("Bid value: \"{}\"", valueStr);
+					
+					elBid.sendKeys(valueStr);
+					elSend.click();
+				}
+			}
+		} catch (NoSuchElementException e) {
+			logger.error("Messages table not found or malformed.", e);
+		}
+	}
+
+	private class ElementInfo {
+		WebElement elItem;
+		
+		boolean winning;
+		String id;
+		String description;
+		boolean opened;
+		boolean randomFinish;
+		long myBid;
+		long bestBid;
+
+		public WebElement getWinningElement() {
+			return elItem.findElement(By.xpath(".//td[1]/img"));
+		}
+		
+		public WebElement getIdElement() {
+			return elItem.findElement(By.xpath(".//td[2]/a"));
+		}
+		
+		public WebElement getDescriptionElement() {
+			return elItem.findElement(By.xpath(".//td[4]/a"));
+		}
+		
+		public WebElement getSituationElement() {
+			return elItem.findElement(By.xpath(".//td[5]"));
+		}
+		
+		public WebElement getMyBidElement() {
+			return elItem.findElement(By.xpath(".//td[6]"));
+		}
+		
+		public WebElement getBestBidElement() {
+			return elItem.findElement(By.xpath(".//td[7]"));
+		}
+		
+		public WebElement getPlaceBidElement() {
+			return elItem.findElement(By.xpath(".//td[8]/input"));
+		}
+		
+		public WebElement getPlaceBidButtonElement() {
+			return elItem.findElement(By.xpath(".//td[10]/a"));
+		}
+		
+		public ElementInfo(WebElement elItem) {
+			this.elItem = elItem;
+			
+			String strWinning = getWinningElement().getAttribute("src");
+			winning = ("LanceNaoVencedor.git".equals(strWinning));
+			id = getIdElement().getText();
+			description = getDescriptionElement().getText();
+			
+			opened = false;
+			randomFinish = false;
+			String strSituation = getSituationElement().getText();
+			switch (strSituation) {
+			case "Fechado":							opened = false;	randomFinish = false;	break;
+			case "Aviso de Iminência":				opened = true;	randomFinish = false;	break;
+			case "Encerramento Aleatório":			opened = true;	randomFinish = true;	break;
+			case "Em desempate ME/EPP":				/* TODO */								break;
+			case "Aguardando convocação ME/EPP":	/* TODO */								break;
+			case "Encerrado":						opened = false;	randomFinish = false;	break;
+			}
+			
+			String htmlMyBid = getMyBidElement().getAttribute("innerHTML");
+			myBid = extractBidValueFromHTML(htmlMyBid);
+			
+			String htmlBestBid = getBestBidElement().getAttribute("innerHTML");
+			bestBid = extractBidValueFromHTML(htmlBestBid);
+		}
+	}
+	
 }
